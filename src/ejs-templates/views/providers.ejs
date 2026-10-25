@@ -1,0 +1,174 @@
+<div style="padding: 24px 32px; height: 100vh; overflow-y: auto;">
+
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <div>
+      <h2 style="font-size: 18px; font-weight: 700; color: #f8fafc;">Providers</h2>
+      <p style="font-size: 12px; color: #64748b; margin-top: 2px;">Configure LLM & Embedding providers (OpenAI, Anthropic, Ollama, Local Proxies)</p>
+    </div>
+    <div style="display: flex; gap: 8px;">
+      <button class="btn btn-outline" onclick="toggleBulk()">Bulk Import</button>
+      <button class="btn btn-primary" onclick="openCreateModal()">+ Add Provider</button>
+    </div>
+  </div>
+
+  <!-- Bulk JSON Form -->
+  <div id="bulkSection" class="card" style="display: none; margin-bottom: 16px;">
+    <h3 style="font-size: 13px; font-weight: 700; color: #42b883; margin-bottom: 6px;">Bulk Import Providers</h3>
+    <textarea id="bulkJson" class="textarea" rows="5" placeholder='[{"id":"local-proxy","name":"Local Proxy","protocol":"openai","baseUrl":"http://localhost:20128/v1","apiKey":"sk-..."}]'></textarea>
+    <div style="margin-top: 10px; display: flex; gap: 8px;">
+      <button class="btn btn-primary" onclick="submitBulk()">Import</button>
+      <button class="btn btn-outline" onclick="toggleBulk()">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Fixed Layout Table for Providers -->
+  <div class="card" style="padding: 0; overflow: hidden; border: 1px solid #1e293b;">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th style="width: 18%;">ID</th>
+          <th style="width: 25%;">Name</th>
+          <th style="width: 14%;">Protocol</th>
+          <th style="width: 28%;">Base URL</th>
+          <th style="width: 15%; text-align: right;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (providers && providers.length > 0) { %>
+          <% providers.forEach(p => { %>
+            <tr>
+              <td style="font-weight: 700; color: #f8fafc; font-family: monospace;"><%= p.id %></td>
+              <td style="color: #cbd5e1;"><%= p.name %></td>
+              <td><span style="background: #1e293b; border: 1px solid #334155; padding: 2px 7px; border-radius: 4px; font-size: 11px; color: #42b883; font-family: monospace;"><%= p.protocol %></span></td>
+              <td style="color: #64748b; font-family: monospace; font-size: 12px;"><%= p.baseUrl %></td>
+              <td style="text-align: right;">
+                <button class="btn btn-outline" style="padding: 3px 8px; font-size: 11.5px; margin-right: 4px;" onclick='openEditModal(<%= JSON.stringify(p) %>)'>Edit</button>
+                <a href="/providers/<%= p.id %>/models" class="btn btn-outline" style="padding: 3px 8px; font-size: 11.5px; margin-right: 4px; color: #38bdf8; border-color: #38bdf8;">Models</a>
+                <button class="btn btn-danger" style="padding: 3px 8px; font-size: 11.5px;" onclick="deleteProvider('<%= p.id %>')">Delete</button>
+              </td>
+            </tr>
+          <% }); %>
+        <% } else { %>
+          <tr>
+            <td colspan="5" style="padding: 32px; text-align: center; color: #475569;">No providers configured yet. Click "+ Add Provider" to begin.</td>
+          </tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<!-- Modal Form Upsert Provider -->
+<div id="providerModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); z-index: 100; align-items: center; justify-content: center;">
+  <div class="card" style="width: 480px; max-width: 90vw;">
+    <h3 id="modalTitle" style="font-size: 15px; font-weight: 700; color: #f8fafc; margin-bottom: 14px;">Add Provider</h3>
+    <form id="providerForm" onsubmit="saveProvider(event)">
+      <div style="margin-bottom: 12px;">
+        <label style="display: block; font-size: 12px; color: #64748b; margin-bottom: 4px;">Provider ID</label>
+        <input type="text" id="provId" required class="input-text" placeholder="e.g. local-proxy, openai, ollama">
+      </div>
+      <div style="margin-bottom: 12px;">
+        <label style="display: block; font-size: 12px; color: #64748b; margin-bottom: 4px;">Display Name</label>
+        <input type="text" id="provName" required class="input-text" placeholder="e.g. Local Proxy Endpoint">
+      </div>
+      <div style="margin-bottom: 12px;">
+        <label style="display: block; font-size: 12px; color: #64748b; margin-bottom: 4px;">Protocol</label>
+        <select id="provProtocol" class="input-text">
+          <option value="openai">OpenAI compatible</option>
+          <option value="anthropic">Anthropic compatible</option>
+        </select>
+      </div>
+      <div style="margin-bottom: 12px;">
+        <label style="display: block; font-size: 12px; color: #64748b; margin-bottom: 4px;">Base URL</label>
+        <input type="url" id="provUrl" required class="input-text" placeholder="http://localhost:20128/v1">
+      </div>
+      <div style="margin-bottom: 16px;">
+        <label style="display: block; font-size: 12px; color: #64748b; margin-bottom: 4px;">API Key</label>
+        <input type="password" id="provKey" class="input-text" placeholder="Leave empty for local Ollama">
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 8px;">
+        <button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Provider</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  let isEditing = false;
+
+  function toggleBulk() {
+    const s = document.getElementById('bulkSection');
+    s.style.display = s.style.display === 'none' ? 'block' : 'none';
+  }
+
+  function openCreateModal() {
+    isEditing = false;
+    document.getElementById('modalTitle').innerText = 'Add Provider';
+    document.getElementById('provId').value = '';
+    document.getElementById('provId').disabled = false;
+    document.getElementById('provName').value = '';
+    document.getElementById('provProtocol').value = 'openai';
+    document.getElementById('provUrl').value = '';
+    document.getElementById('provKey').value = '';
+    document.getElementById('providerModal').style.display = 'flex';
+  }
+
+  function openEditModal(p) {
+    isEditing = true;
+    document.getElementById('modalTitle').innerText = 'Edit Provider: ' + p.id;
+    document.getElementById('provId').value = p.id;
+    document.getElementById('provId').disabled = true;
+    document.getElementById('provName').value = p.name;
+    document.getElementById('provProtocol').value = p.protocol;
+    document.getElementById('provUrl').value = p.baseUrl;
+    document.getElementById('provKey').value = p.apiKey || '';
+    document.getElementById('providerModal').style.display = 'flex';
+  }
+
+  function closeModal() {
+    document.getElementById('providerModal').style.display = 'none';
+  }
+
+  async function saveProvider(e) {
+    e.preventDefault();
+    const data = {
+      id: document.getElementById('provId').value.trim(),
+      name: document.getElementById('provName').value.trim(),
+      protocol: document.getElementById('provProtocol').value,
+      baseUrl: document.getElementById('provUrl').value.trim(),
+      apiKey: document.getElementById('provKey').value.trim()
+    };
+    await fetch('/api/providers', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    location.reload();
+  }
+
+  async function submitBulk() {
+    try {
+      const parsed = JSON.parse(document.getElementById('bulkJson').value);
+      await fetch('/api/providers/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(parsed)
+      });
+      location.reload();
+    } catch (e) {
+      alert('Invalid JSON: ' + e.message);
+    }
+  }
+
+  async function deleteProvider(id) {
+    if (!confirm('Delete provider "' + id + '" and all linked models?')) return;
+    const res = await fetch('/api/providers/' + id, { method: 'DELETE' });
+    if (res.ok) {
+      location.reload();
+    } else {
+      alert('Delete failed.');
+    }
+  }
+</script>

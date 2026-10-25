@@ -1,0 +1,133 @@
+<div style="padding: 24px 32px; height: 100vh; overflow-y: auto; max-width: 900px; margin: 0 auto;">
+
+  <div style="margin-bottom: 24px; border-bottom: 1px solid #1e293b; padding-bottom: 16px;">
+    <h1 style="font-size: 20px; font-weight: 700; color: #f8fafc;">System & Semantic Settings</h1>
+    <p style="font-size: 12px; color: #64748b; margin-top: 4px;">Configure active embedding model, hybrid search ratios, and default parameters</p>
+  </div>
+
+  <!-- 1. Semantic Embedding Configuration -->
+  <div class="card" style="margin-bottom: 20px;">
+    <h3 style="font-size: 14px; font-weight: 700; color: #42b883; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em;">
+      Active Semantic Embedding Model
+    </h3>
+    <p style="font-size: 12px; color: #94a3b8; margin-bottom: 16px; line-height: 1.5;">
+      Select which registered model calculates vector embeddings for Vue 3 documentation and realtime queries:
+    </p>
+
+    <div style="margin-bottom: 16px;">
+      <label style="display: block; font-size: 12px; color: #64748b; margin-bottom: 6px;">Configured Embedding Models:</label>
+      <select id="activeEmbeddingModel" class="input-text" style="font-family: monospace;">
+        <% if (embeddingModels && embeddingModels.length > 0) { %>
+          <% embeddingModels.forEach(m => { %>
+            <option value="<%= m.id %>" <%= activeEmbeddingId === m.id ? 'selected' : '' %>>
+              <%= m.provider.name %> &rarr; <%= m.id %> (<%= m.modelName %>)
+            </option>
+          <% }); %>
+        <% } else { %>
+          <option value="">No embedding models registered (using local 56-dim feature vector)</option>
+        <% } %>
+      </select>
+    </div>
+
+    <div style="display: flex; gap: 10px; align-items: center;">
+      <button class="btn btn-primary" onclick="saveActiveEmbedding()">Save Active Embedding Model</button>
+      <button class="btn btn-outline" id="btnReindex" onclick="triggerReindexAll()">⚡ Re-index All Documents Now</button>
+      <span id="reindexStatus" style="font-size: 11px; color: #64748b; font-family: monospace;"></span>
+    </div>
+  </div>
+
+  <!-- 2. Search & Hybrid Default Configuration -->
+  <div class="card" style="margin-bottom: 20px;">
+    <h3 style="font-size: 14px; font-weight: 700; color: #38bdf8; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em;">
+      Default Search Strategy
+    </h3>
+    <p style="font-size: 12px; color: #94a3b8; margin-bottom: 16px; line-height: 1.5;">
+      Set default search behavior across Knowledge Base and Agent tools:
+    </p>
+
+    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 14px; margin-bottom: 16px;">
+      <div>
+        <label style="display: block; font-size: 12px; color: #64748b; margin-bottom: 4px;">Default Search Mode</label>
+        <select id="defaultSearchMode" class="input-text">
+          <option value="hybrid" <%= defaultMode === 'hybrid' ? 'selected' : '' %>>Hybrid (Fuzzy + Semantic Combined)</option>
+          <option value="semantic" <%= defaultMode === 'semantic' ? 'selected' : '' %>>Semantic Only (Cosine Vector Space)</option>
+          <option value="fuzzy" <%= defaultMode === 'fuzzy' ? 'selected' : '' %>>Fuzzy Only (Exact Word Match)</option>
+        </select>
+      </div>
+      <div>
+        <label style="display: block; font-size: 12px; color: #64748b; margin-bottom: 4px;">Default Hybrid Ratio (Semantic Weight: <span id="weightDisplay"><%= defaultWeight * 100 %>%</span>)</label>
+        <input type="range" id="defaultWeight" min="0" max="1" step="0.05" value="<%= defaultWeight %>" style="width: 100%; accent-color: #38bdf8; margin-top: 6px;" oninput="document.getElementById('weightDisplay').innerText = Math.round(this.value * 100) + '%'">
+      </div>
+    </div>
+
+    <button class="btn btn-primary" onclick="saveSearchDefaults()">Save Search Defaults</button>
+  </div>
+
+  <!-- 3. Target Documentation Versioning -->
+  <div class="card">
+    <h3 style="font-size: 14px; font-weight: 700; color: #f59e0b; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.05em;">
+      Framework Versioning
+    </h3>
+    <p style="font-size: 12px; color: #94a3b8; margin-bottom: 12px; line-height: 1.5;">
+      Current Vue documentation version locked for knowledge base validity:
+    </p>
+    <div style="display: flex; gap: 12px; align-items: center;">
+      <span style="font-size: 16px; font-weight: 800; color: #f8fafc; font-family: monospace;">Vue v3.5.0</span>
+      <span style="background: #1e293b; color: #42b883; padding: 2px 8px; border-radius: 4px; font-size: 11px;">Active Benchmark</span>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  async function saveActiveEmbedding() {
+    const modelId = document.getElementById('activeEmbeddingModel').value;
+    const res = await fetch('/api/settings/embedding-model', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ modelId })
+    });
+    if (res.ok) {
+      alert('Active embedding model saved successfully.');
+    } else {
+      alert('Failed to save embedding model.');
+    }
+  }
+
+  async function triggerReindexAll() {
+    const btn = document.getElementById('btnReindex');
+    const status = document.getElementById('reindexStatus');
+    btn.disabled = true;
+    btn.innerText = 'Re-indexing...';
+    status.innerText = 'Generating vectors via active provider...';
+
+    try {
+      const res = await fetch('/api/documents/reindex', { method: 'POST' });
+      const data = await res.json();
+      status.innerText = 'Completed ' + data.count + ' documents.';
+      alert('Re-indexing complete: ' + data.count + ' documents updated with active embedding vectors.');
+    } catch (e) {
+      status.innerText = 'Error!';
+      alert('Reindex error: ' + e.message);
+    } finally {
+      btn.disabled = false;
+      btn.innerText = '⚡ Re-index All Documents Now';
+    }
+  }
+
+  async function saveSearchDefaults() {
+    const mode = document.getElementById('defaultSearchMode').value;
+    const weight = parseFloat(document.getElementById('defaultWeight').value);
+
+    const res = await fetch('/api/settings/search-defaults', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ mode, weight })
+    });
+    if (res.ok) {
+      alert('Search defaults saved.');
+    } else {
+      alert('Failed to save search defaults.');
+    }
+  }
+</script>

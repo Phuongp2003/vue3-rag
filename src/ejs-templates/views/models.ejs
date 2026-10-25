@@ -1,0 +1,278 @@
+<div style="padding: 24px 32px; height: 100vh; overflow-y: auto;">
+
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <div>
+      <a href="/providers" style="color: #64748b; text-decoration: none; font-size: 12px; display: inline-flex; align-items: center; gap: 4px; margin-bottom: 4px;">
+        &larr; Back to Providers
+      </a>
+      <h2 style="font-size: 18px; font-weight: 700; color: #f8fafc;"><%= provider.name %> &mdash; Models</h2>
+    </div>
+    <div style="display: flex; gap: 8px;">
+      <button class="btn btn-outline" onclick="toggleBulk()">Bulk Import</button>
+      <button class="btn btn-primary" onclick="openCreateModal()">+ Add Model</button>
+    </div>
+  </div>
+
+  <!-- Bulk Models Section -->
+  <div id="bulkSection" class="card" style="display: none; margin-bottom: 16px;">
+    <h3 style="font-size: 13px; font-weight: 700; color: #42b883; margin-bottom: 6px;">Bulk Import Models</h3>
+    <textarea id="bulkJson" class="textarea" rows="5" placeholder='[{"id":"gpt-4o-mini","modelName":"gpt-4o-mini","type":"chat","contextWindow":128000},{"id":"text-embedding-3-large","modelName":"openrouter/openai/text-embedding-3-large","type":"embedding"}]'></textarea>
+    <div style="margin-top: 10px; display: flex; gap: 8px;">
+      <button class="btn btn-primary" onclick="submitBulk()">Import</button>
+      <button class="btn btn-outline" onclick="toggleBulk()">Cancel</button>
+    </div>
+  </div>
+
+  <!-- Fixed Layout Table for Models -->
+  <div class="card" style="padding: 0; overflow: hidden; border: 1px solid #1e293b;">
+    <table class="data-table">
+      <thead>
+        <tr>
+          <th style="width: 20%;">ID</th>
+          <th style="width: 28%;">API Model Name</th>
+          <th style="width: 14%;">Type</th>
+          <th style="width: 16%;">Context Window</th>
+          <th style="width: 22%; text-align: right;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        <% if (models && models.length > 0) { %>
+          <% models.forEach(m => { %>
+            <tr>
+              <td style="font-weight: 700; color: #f8fafc; font-family: monospace;"><%= m.id %></td>
+              <td style="font-family: monospace; font-size: 12px; color: #94a3b8;"><%= m.modelName %></td>
+              <td>
+                <span style="background: #1e293b; border: 1px solid <%= m.type === 'chat' ? '#0369a1' : '#6b21a8' %>; padding: 2px 7px; border-radius: 4px; font-size: 11px; color: <%= m.type === 'chat' ? '#38bdf8' : '#c084fc' %>; font-weight: 600; text-transform: uppercase;">
+                  <%= m.type %>
+                </span>
+              </td>
+              <td style="color: #64748b; font-size: 12px; font-family: monospace;"><%= m.contextWindow %> tokens</td>
+              <td style="text-align: right;">
+                <button class="btn btn-outline" style="padding: 3px 8px; font-size: 11.5px; margin-right: 3px; color: #34d399; border-color: #059669;" onclick="pingModel('<%= m.id %>')">Ping</button>
+                <button class="btn btn-outline" style="padding: 3px 8px; font-size: 11.5px; margin-right: 3px; color: #38bdf8; border-color: #0284c7;" onclick="openTestModal('<%= m.id %>', '<%= m.type %>')">Test</button>
+                <button class="btn btn-outline" style="padding: 3px 8px; font-size: 11.5px; margin-right: 3px;" onclick='openEditModal(<%= JSON.stringify(m) %>)'>Edit</button>
+                <button class="btn btn-danger" style="padding: 3px 8px; font-size: 11.5px;" onclick="deleteModel('<%= m.id %>')">Delete</button>
+              </td>
+            </tr>
+          <% }); %>
+        <% } else { %>
+          <tr>
+            <td colspan="5" style="padding: 32px; text-align: center; color: #475569;">No models configured for this provider.</td>
+          </tr>
+        <% } %>
+      </tbody>
+    </table>
+  </div>
+
+</div>
+
+<!-- Modal Form Upsert/Edit Model -->
+<div id="modelModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); z-index: 100; align-items: center; justify-content: center;">
+  <div class="card" style="width: 480px; max-width: 90vw;">
+    <h3 id="modelModalTitle" style="font-size: 15px; font-weight: 700; color: #f8fafc; margin-bottom: 14px;">Add Model</h3>
+    <form id="modelForm" onsubmit="saveModel(event)">
+      <div style="margin-bottom: 12px;">
+        <label style="display: block; font-size: 12px; color: #64748b; margin-bottom: 4px;">Model ID (Unique identifier)</label>
+        <input type="text" id="mId" required class="input-text" placeholder="e.g. gpt-4o-mini, text-embedding-3-large">
+      </div>
+      <div style="margin-bottom: 12px;">
+        <label style="display: block; font-size: 12px; color: #64748b; margin-bottom: 4px;">API Model Name (Exact string sent to provider)</label>
+        <input type="text" id="mName" required class="input-text" placeholder="e.g. openrouter/openai/text-embedding-3-large">
+      </div>
+      <div style="margin-bottom: 12px;">
+        <label style="display: block; font-size: 12px; color: #64748b; margin-bottom: 4px;">Model Purpose</label>
+        <select id="mType" class="input-text">
+          <option value="chat">Chat / Completion</option>
+          <option value="embedding">Embedding (Semantic Search)</option>
+        </select>
+      </div>
+      <div style="margin-bottom: 12px;">
+        <label style="display: block; font-size: 12px; color: #64748b; margin-bottom: 4px;">Context Window (Tokens)</label>
+        <input type="number" id="mContext" value="4096" class="input-text">
+      </div>
+      <div style="margin-bottom: 16px;">
+        <label style="display: block; font-size: 12px; color: #64748b; margin-bottom: 4px;">Default Params (JSON)</label>
+        <textarea id="mParams" class="textarea" rows="2" placeholder='{"temperature": 0.7}'></textarea>
+      </div>
+      <div style="display: flex; justify-content: flex-end; gap: 8px;">
+        <button type="button" class="btn btn-outline" onclick="closeModal()">Cancel</button>
+        <button type="submit" class="btn btn-primary">Save Model</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modal Test Model -->
+<div id="testModal" style="display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); z-index: 100; align-items: center; justify-content: center;">
+  <div class="card" style="width: 560px; max-width: 90vw;">
+    <h3 style="font-size: 15px; font-weight: 700; color: #f8fafc; margin-bottom: 14px;" id="testTitle">Test Model</h3>
+    <div style="margin-bottom: 12px;">
+      <label style="display: block; font-size: 12px; color: #64748b; margin-bottom: 4px;">Prompt / Input</label>
+      <textarea id="testPrompt" class="textarea" rows="3"></textarea>
+    </div>
+    <div style="margin-bottom: 12px;">
+      <label style="display: block; font-size: 12px; color: #64748b; margin-bottom: 4px;">Custom Params (JSON)</label>
+      <input type="text" id="testCustomParams" class="input-text" placeholder='{"temperature": 0.2}'>
+    </div>
+    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+      <button class="btn btn-primary" id="btnExecuteTest" onclick="executeTest()">Execute Test</button>
+      <span id="testStatus" style="font-size: 12px; color: #64748b; font-family: monospace;"></span>
+    </div>
+    <div>
+      <pre id="testOutput" style="background: #050811; padding: 10px 12px; border-radius: 6px; font-size: 12px; max-height: 200px; overflow-y: auto; color: #38bdf8; border: 1px solid #1e293b; white-space: pre-wrap; font-family: monospace;"></pre>
+    </div>
+    <div style="display: flex; justify-content: flex-end; margin-top: 14px;">
+      <button type="button" class="btn btn-outline" onclick="closeTestModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  let activeTestModelId = null;
+  let activeTestModelType = 'chat';
+
+  function toggleBulk() {
+    const s = document.getElementById('bulkSection');
+    s.style.display = s.style.display === 'none' ? 'block' : 'none';
+  }
+
+  function openCreateModal() {
+    document.getElementById('modelModalTitle').innerText = 'Add Model to <%= provider.name %>';
+    document.getElementById('mId').value = '';
+    document.getElementById('mId').disabled = false;
+    document.getElementById('mName').value = '';
+    document.getElementById('mType').value = 'chat';
+    document.getElementById('mContext').value = '4096';
+    document.getElementById('mParams').value = '';
+    document.getElementById('modelModal').style.display = 'flex';
+  }
+
+  function openEditModal(m) {
+    document.getElementById('modelModalTitle').innerText = 'Edit Model: ' + m.id;
+    document.getElementById('mId').value = m.id;
+    document.getElementById('mId').disabled = true;
+    document.getElementById('mName').value = m.modelName;
+    document.getElementById('mType').value = m.type || 'chat';
+    document.getElementById('mContext').value = m.contextWindow || 4096;
+    document.getElementById('mParams').value = JSON.stringify(m.defaultParams || {});
+    document.getElementById('modelModal').style.display = 'flex';
+  }
+
+  function closeModal() {
+    document.getElementById('modelModal').style.display = 'none';
+  }
+
+  function openTestModal(id, type) {
+    activeTestModelId = id;
+    activeTestModelType = type;
+    document.getElementById('testTitle').innerText = 'Test Model: ' + id + ' (' + type.toUpperCase() + ')';
+    document.getElementById('testPrompt').value = type === 'chat' ? 'Hello! Who are you?' : 'The quick brown fox jumps over the lazy dog';
+    document.getElementById('testOutput').innerText = 'Ready.';
+    document.getElementById('testStatus').innerText = '';
+    document.getElementById('testModal').style.display = 'flex';
+  }
+
+  function closeTestModal() {
+    document.getElementById('testModal').style.display = 'none';
+  }
+
+  async function saveModel(e) {
+    e.preventDefault();
+    let defaultParams = {};
+    try {
+      const p = document.getElementById('mParams').value.trim();
+      if (p) defaultParams = JSON.parse(p);
+    } catch (_) {}
+
+    const data = {
+      id: document.getElementById('mId').value.trim(),
+      providerId: '<%= provider.id %>',
+      modelName: document.getElementById('mName').value.trim(),
+      type: document.getElementById('mType').value,
+      contextWindow: parseInt(document.getElementById('mContext').value) || 4096,
+      defaultParams
+    };
+    await fetch('/api/providers/<%= provider.id %>/models', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    });
+    location.reload();
+  }
+
+  async function submitBulk() {
+    try {
+      const parsed = JSON.parse(document.getElementById('bulkJson').value);
+      await fetch('/api/providers/<%= provider.id %>/models/bulk', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(parsed)
+      });
+      location.reload();
+    } catch (e) {
+      alert('Invalid JSON: ' + e.message);
+    }
+  }
+
+  async function deleteModel(id) {
+    if (!confirm('Are you sure you want to delete model "' + id + '"?')) return;
+    const res = await fetch('/api/providers/<%= provider.id %>/models/' + id, { method: 'DELETE' });
+    if (res.ok) {
+      location.reload();
+    } else {
+      alert('Failed to delete model.');
+    }
+  }
+
+  async function pingModel(id) {
+    const btn = event.target;
+    const old = btn.innerText;
+    btn.innerText = '...';
+    try {
+      const res = await fetch('/api/models/' + id + '/ping', { method: 'POST' });
+      const data = await res.json();
+      if (res.ok) {
+        alert('Latency: ' + data.latencyMs + 'ms\n' + (data.content || 'OK'));
+      } else {
+        alert('Failed: ' + (data.error || res.statusText));
+      }
+    } catch (e) {
+      alert('Error: ' + e.message);
+    } finally {
+      btn.innerText = old;
+    }
+  }
+
+  async function executeTest() {
+    const prompt = document.getElementById('testPrompt').value.trim();
+    let customParams = {};
+    try {
+      const cp = document.getElementById('testCustomParams').value.trim();
+      if (cp) customParams = JSON.parse(cp);
+    } catch (err) {
+      alert('Invalid JSON params: ' + err.message);
+      return;
+    }
+
+    const status = document.getElementById('testStatus');
+    const out = document.getElementById('testOutput');
+    status.innerText = 'Executing...';
+    out.innerText = 'Calling model endpoint...';
+
+    const startTime = Date.now();
+    try {
+      const res = await fetch('/api/models/' + activeTestModelId + '/test', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, customParams })
+      });
+      const data = await res.json();
+      const elapsed = Date.now() - startTime;
+      status.innerText = elapsed + 'ms';
+      out.innerText = JSON.stringify(data, null, 2);
+    } catch (e) {
+      status.innerText = 'Error';
+      out.innerText = e.message;
+    }
+  }
+</script>

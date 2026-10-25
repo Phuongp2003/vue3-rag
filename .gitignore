@@ -1,0 +1,9 @@
+node_modules/
+dist/
+presets.db
+.env
+.env.local
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.tmp

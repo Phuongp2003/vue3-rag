@@ -1,0 +1,370 @@
+<div style="display: flex; flex-direction: column; height: 100vh; width: 100%; position: relative; overflow: hidden;">
+
+  <!-- ========================================================
+       TOP NAVBAR (Fixed Height, Header + Model + Turning Trigger)
+       ======================================================== -->
+  <header style="height: 54px; min-height: 54px; border-bottom: 1px solid #1e293b; background: #0b1120; display: flex; align-items: center; justify-content: space-between; padding: 0 20px; z-index: 30;">
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <span style="color: #42b883; font-weight: 800; font-size: 16px;">▲</span>
+      <div>
+        <h1 style="font-size: 14px; font-weight: 700; color: #f8fafc; line-height: 1.2;">Vue 3 Assistant</h1>
+        <span style="font-size: 10.5px; color: #64748b;">RAG Autonomous Engine</span>
+      </div>
+    </div>
+
+    <!-- Center/Right controls -->
+    <div style="display: flex; align-items: center; gap: 10px;">
+
+      <!-- HOVERABLE TURNING TRACE TRIGGER (Dropdown covers 75% width on hover) -->
+      <div class="trace-dropdown-wrapper" style="position: relative;">
+        <button id="btnTraceStatus" class="btn btn-outline" style="padding: 4px 10px; font-size: 11.5px; border-color: #334155; display: flex; align-items: center; gap: 6px;">
+          <span id="traceIndicator" style="width: 7px; height: 7px; border-radius: 50%; background: #64748b; display: inline-block;"></span>
+          <span style="font-weight: 600;">Turning Trace</span>
+          <span style="font-size: 10px; color: #64748b;">(Hover 75% View)</span>
+        </button>
+
+        <!-- 75% WIDTH FLOATING TRACE OVERLAY -->
+        <div class="trace-overlay-panel" style="position: fixed; top: 54px; right: 0; width: 75vw; height: calc(100vh - 54px); background: rgba(9, 13, 22, 0.98); backdrop-filter: blur(8px); border-left: 1px solid #334155; box-shadow: -16px 0 40px rgba(0,0,0,0.8); z-index: 99; opacity: 0; pointer-events: none; transform: translateX(100%); transition: opacity 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1); display: flex; flex-direction: column; padding: 20px 24px;">
+
+          <div style="display: flex; justify-content: space-between; align-items: center; padding-bottom: 12px; border-bottom: 1px solid #1e293b; margin-bottom: 16px;">
+            <div>
+              <h3 style="font-size: 15px; font-weight: 700; color: #f59e0b; text-transform: uppercase; letter-spacing: 0.05em;">AI Reasoning & Turning Execution Trace</h3>
+              <p style="font-size: 11.5px; color: #94a3b8;">Detailed live observation of prompt compacting, autonomous RAG tools, and injected context</p>
+            </div>
+            <div style="display: flex; gap: 8px; align-items: center;">
+              <span id="traceCountBadge" style="font-size: 11px; background: #1e293b; color: #42b883; padding: 3px 8px; border-radius: 4px; font-family: monospace;">0 STEPS</span>
+              <span style="font-size: 11px; color: #64748b;">(Move mouse away to close)</span>
+            </div>
+          </div>
+
+          <!-- Tool Registry Quick Toggles inside trace view -->
+          <div style="margin-bottom: 14px; background: #050811; border: 1px solid #1e293b; border-radius: 6px; padding: 10px 14px;">
+            <div style="font-size: 11px; font-weight: 700; color: #38bdf8; text-transform: uppercase; margin-bottom: 6px;">Configured Autonomous Tools</div>
+            <div style="display: flex; gap: 16px;">
+              <% if (tools && tools.length > 0) { %>
+                <% tools.forEach(t => { %>
+                  <label style="display: flex; align-items: center; gap: 6px; font-size: 12px; color: #cbd5e1; cursor: pointer;">
+                    <input type="checkbox" <%= t.enabled ? 'checked' : '' %> onchange="toggleTool('<%= t.name %>', this.checked)" style="accent-color: #42b883;">
+                    <code><%= t.name %></code>
+                  </label>
+                <% }); %>
+              <% } %>
+            </div>
+          </div>
+
+          <!-- Live Turning Stream Log -->
+          <div id="turningTraceContainer" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; font-size: 12px; padding-right: 4px;">
+            <div style="color: #64748b; text-align: center; padding: 48px 0;">No active turn executed yet. Ask a question to see the complete turning pipeline.</div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Model Selector -->
+      <select id="chatModelSelect" class="input-text" style="width: auto; min-width: 170px; padding: 4px 8px; font-size: 11.5px;">
+        <% if (chatModels && chatModels.length > 0) { %>
+          <% chatModels.forEach(m => { %>
+            <option value="<%= m.id %>"><%= m.provider.name %> &rarr; <%= m.id %></option>
+          <% }); %>
+        <% } else { %>
+          <option value="">No chat models configured</option>
+        <% } %>
+      </select>
+
+      <button class="btn btn-outline" style="padding: 4px 10px; font-size: 11.5px;" onclick="clearHistory()">Clear</button>
+    </div>
+  </header>
+
+  <!-- ========================================================
+       CHAT MESSAGES SCROLL AREA (Fixed Height, Overflow Y auto)
+       ======================================================== -->
+  <main id="chatHistory" style="flex: 1; overflow-y: auto; padding: 24px 20px; display: flex; flex-direction: column; gap: 18px; width: 100%; max-width: 900px; margin: 0 auto;">
+    <!-- Welcome message -->
+    <div class="chat-row assistant-row" style="display: flex; flex-direction: column; align-items: flex-start; width: 100%;">
+      <div style="font-size: 10.5px; font-weight: 700; color: #42b883; margin-bottom: 4px; letter-spacing: 0.05em;">VUE 3 ASSISTANT</div>
+      <div class="chat-bubble chat-bot-bubble" style="background: #0f172a; border: 1px solid #1e293b; border-radius: 8px; padding: 14px 18px; width: 100%; max-width: 850px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+        <div class="markdown-body">
+          <p>Hello! I am your <strong>Vue 3 Documentation RAG Assistant</strong>.</p>
+          <p>I can help solve architectural and practical coding problems using official Vue 3.5+ specifications (Reactivity, Teleport, KeepAlive, Provide/Inject, Lifecycle, Composables vs Options API).</p>
+          <p style="margin-bottom: 0; color: #94a3b8; font-size: 12px;"><em>Tip: Hover over the <strong>Turning Trace</strong> button in the top navbar to inspect the live query compacting, search mode, and raw retrieved context.</em></p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <!-- ========================================================
+       FIXED BOTTOM INPUT BAR (Never shrinks, pinned at bottom)
+       ======================================================== -->
+  <footer style="min-height: 84px; height: 84px; border-top: 1px solid #1e293b; background: #0b1120; display: flex; align-items: center; padding: 0 20px; z-index: 25;">
+    <form id="chatForm" onsubmit="sendMessage(event)" style="display: flex; gap: 10px; width: 100%; max-width: 900px; margin: 0 auto; align-items: center;">
+      <textarea
+        id="userInput"
+        class="textarea"
+        rows="2"
+        placeholder="Describe a Vue 3 problem or question (e.g. 'How to render controller on navbar while keeping logic in component A?')..."
+        style="resize: none; font-size: 13px; line-height: 1.4; height: 52px; padding: 8px 12px;"
+        onkeydown="handleKeyDown(event)"
+      ></textarea>
+      <button type="submit" id="btnSend" class="btn btn-primary" style="min-width: 84px; height: 52px; font-size: 13px; font-weight: 700;">
+        Send
+      </button>
+    </form>
+  </footer>
+
+</div>
+
+<style>
+  /* CSS to trigger 75% turning trace overlay on hover */
+  .trace-dropdown-wrapper:hover .trace-overlay-panel {
+    opacity: 1 !important;
+    pointer-events: auto !important;
+    transform: translateX(0) !important;
+  }
+
+  /* Distinct User Message Highlighting */
+  .chat-row.user-row {
+    align-items: flex-end !important;
+  }
+  .chat-user-bubble {
+    background: linear-gradient(135deg, #1e3a8a 0%, #172554 100%) !important;
+    border: 1px solid #3b82f6 !important;
+    color: #f8fafc !important;
+    border-bottom-right-radius: 2px !important;
+    padding: 12px 18px !important;
+    max-width: 75% !important;
+    box-shadow: 0 4px 16px rgba(37, 99, 235, 0.25) !important;
+    font-size: 13.5px !important;
+    line-height: 1.55 !important;
+  }
+</style>
+
+<script>
+  let conversationHistory = [];
+  let turnStepCount = 0;
+
+  function handleKeyDown(e) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      document.getElementById('chatForm').dispatchEvent(new Event('submit'));
+    }
+  }
+
+  // Render markdown using Marked.js safely
+  function renderMarkdown(rawText) {
+    if (window.marked && typeof window.marked.parse === 'function') {
+      return window.marked.parse(rawText, { breaks: true, gfm: true });
+    }
+    const div = document.createElement('div');
+    div.innerText = rawText;
+    return div.innerHTML;
+  }
+
+  function appendUserMessage(text) {
+    const historyEl = document.getElementById('chatHistory');
+    const row = document.createElement('div');
+    row.className = 'chat-row user-row';
+    row.style.display = 'flex';
+    row.style.flexDirection = 'column';
+    row.style.alignItems = 'flex-end';
+    row.style.width = '100%';
+
+    row.innerHTML = `
+      <div style="font-size: 10.5px; font-weight: 700; color: #60a5fa; margin-bottom: 4px; letter-spacing: 0.05em;">YOU (PROMPT)</div>
+      <div class="chat-bubble chat-user-bubble">
+        <div style="white-space: pre-wrap;">${escapeHtml(text)}</div>
+      </div>
+    `;
+
+    historyEl.appendChild(row);
+    historyEl.scrollTop = historyEl.scrollHeight;
+  }
+
+  function createAssistantMessage() {
+    const historyEl = document.getElementById('chatHistory');
+    const row = document.createElement('div');
+    row.className = 'chat-row assistant-row';
+    row.style.display = 'flex';
+    row.style.flexDirection = 'column';
+    row.style.alignItems = 'flex-start';
+    row.style.width = '100%';
+
+    row.innerHTML = `
+      <div style="font-size: 10.5px; font-weight: 700; color: #42b883; margin-bottom: 4px; letter-spacing: 0.05em;">VUE 3 ASSISTANT</div>
+      <div class="chat-bubble chat-bot-bubble" style="background: #0f172a; border: 1px solid #1e293b; border-radius: 8px; padding: 14px 18px; width: 100%; max-width: 850px; box-shadow: 0 4px 12px rgba(0,0,0,0.3);">
+        <div class="markdown-body">...</div>
+      </div>
+    `;
+
+    historyEl.appendChild(row);
+    historyEl.scrollTop = historyEl.scrollHeight;
+    return row.querySelector('.markdown-body');
+  }
+
+  function appendTraceStep(title, detail, type = 'info') {
+    turnStepCount++;
+    document.getElementById('traceCountBadge').innerText = turnStepCount + ' STEPS';
+
+    const container = document.getElementById('turningTraceContainer');
+    const borderColors = {
+      info: '#38bdf8',
+      tool: '#42b883',
+      model: '#a78bfa',
+      error: '#f87171'
+    };
+
+    const block = document.createElement('div');
+    block.style.background = '#090d16';
+    block.style.border = '1px solid #1e293b';
+    block.style.borderLeft = '4px solid ' + (borderColors[type] || '#38bdf8');
+    block.style.borderRadius = '4px';
+    block.style.padding = '10px 14px';
+
+    let html = '<div style="font-weight: 700; color: #f8fafc; font-size: 12px; margin-bottom: 4px; display: flex; justify-content: space-between;">';
+    html += '<span>' + escapeHtml(title) + '</span>';
+    html += '<span style="font-size: 10px; color: #64748b; font-family: monospace;">STEP #' + turnStepCount + '</span>';
+    html += '</div>';
+
+    if (typeof detail === 'object') {
+      html += '<pre style="margin: 0; background: #050811; padding: 8px; border-radius: 4px; font-size: 11px; color: #cbd5e1; overflow-x: auto; max-height: 220px;"><code>' + escapeHtml(JSON.stringify(detail, null, 2)) + '</code></pre>';
+    } else {
+      html += '<div style="color: #94a3b8; font-size: 11.5px; line-height: 1.5;">' + escapeHtml(detail) + '</div>';
+    }
+    block.innerHTML = html;
+    container.appendChild(block);
+    container.scrollTop = container.scrollHeight;
+  }
+
+  function clearHistory() {
+    conversationHistory = [];
+    document.getElementById('chatHistory').innerHTML = '';
+    document.getElementById('turningTraceContainer').innerHTML = '<div style="color: #64748b; text-align: center; padding: 48px 0;">History cleared.</div>';
+    turnStepCount = 0;
+    document.getElementById('traceCountBadge').innerText = '0 STEPS';
+    document.getElementById('traceIndicator').style.background = '#64748b';
+  }
+
+  async function toggleTool(name, enabled) {
+    await fetch('/api/tools/toggle', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, enabled })
+    });
+  }
+
+  async function sendMessage(e) {
+    e.preventDefault();
+    const inputEl = document.getElementById('userInput');
+    const text = inputEl.value.trim();
+    const modelSelect = document.getElementById('chatModelSelect');
+    const selectedModelId = modelSelect.value;
+
+    if (!text) return;
+    if (!selectedModelId) {
+      alert('Please configure at least one chat model under Providers.');
+      return;
+    }
+
+    appendUserMessage(text);
+    conversationHistory.push({ role: 'user', content: text });
+    inputEl.value = '';
+
+    const btn = document.getElementById('btnSend');
+    btn.disabled = true;
+
+    // Reset turning trace
+    turnStepCount = 0;
+    const traceContainer = document.getElementById('turningTraceContainer');
+    traceContainer.innerHTML = '';
+    document.getElementById('traceIndicator').style.background = '#f59e0b';
+    appendTraceStep('User Turn Dispatched', text, 'info');
+
+    const contentEl = createAssistantMessage();
+    let botFullText = '';
+
+    try {
+      const response = await fetch('/api/chat/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          modelId: selectedModelId,
+          messages: conversationHistory
+        })
+      });
+
+      if (!response.ok) {
+        const err = await response.text();
+        contentEl.innerHTML = '<span style="color: #f87171;">Error: ' + escapeHtml(err) + '</span>';
+        document.getElementById('traceIndicator').style.background = '#f87171';
+        btn.disabled = false;
+        return;
+      }
+
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder('utf-8');
+      let buffer = '';
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const events = buffer.split('\n\n');
+        buffer = events.pop() || '';
+
+        for (const evText of events) {
+          if (!evText.trim()) continue;
+          const lines = evText.split('\n');
+          let eventName = 'message';
+          let dataStr = '';
+
+          for (const line of lines) {
+            if (line.startsWith('event: ')) {
+              eventName = line.slice(7).trim();
+            } else if (line.startsWith('data: ')) {
+              dataStr = line.slice(6).trim();
+            }
+          }
+
+          if (dataStr === '[DONE]') break;
+
+          try {
+            const data = JSON.parse(dataStr);
+
+            if (eventName === 'turn_start') {
+              appendTraceStep(data.title || 'Agent Step', data.detail || '', 'info');
+            } else if (eventName === 'tool_trace') {
+              appendTraceStep('Tool Invoked: ' + data.toolName, data.output, 'tool');
+            } else if (eventName === 'token') {
+              botFullText += data.token;
+              // Real-time Markdown rendering
+              contentEl.innerHTML = renderMarkdown(botFullText);
+              document.getElementById('chatHistory').scrollTop = document.getElementById('chatHistory').scrollHeight;
+            } else if (eventName === 'turn_end') {
+              document.getElementById('traceIndicator').style.background = '#10b981';
+              appendTraceStep('Turn Finalized', 'Generated answer rendered via Markdown', 'model');
+            } else if (eventName === 'error') {
+              document.getElementById('traceIndicator').style.background = '#f87171';
+              appendTraceStep('Runtime Error', data.error, 'error');
+            }
+          } catch (_) {}
+        }
+      }
+
+      conversationHistory.push({ role: 'assistant', content: botFullText });
+    } catch (err) {
+      contentEl.innerHTML = '<span style="color: #f87171;">Stream error: ' + escapeHtml(err.message) + '</span>';
+      document.getElementById('traceIndicator').style.background = '#f87171';
+      appendTraceStep('Fatal Error', err.message, 'error');
+    } finally {
+      btn.disabled = false;
+      inputEl.focus();
+    }
+  }
+
+  function escapeHtml(text) {
+    if (!text) return '';
+    const div = document.createElement('div');
+    div.innerText = text;
+    return div.innerHTML;
+  }
+</script>

@@ -1,0 +1,27 @@
+datasource db {
+  provider = "mongodb"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// Vue 3 Raw Content Store (Full Content & Documentation)
+model VueDocument {
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  slug            String   @unique // e.g. "provide-inject", "teleport", "ref"
+  title           String   // e.g. "provide() / inject()"
+  category        String   // "reactivity", "lifecycle", "built-in-components", "composition-api", "options-api"
+  vueVersion      String   @default("3.5.0") // Tracking version for update triggers
+  summary         String   // Executive summary
+  rawMarkdown     String   // Full detailed markdown document
+  compositionCode String?  // Composition API / <script setup> example
+  optionsCode     String?  // Options API example
+  useCases        String[] // List of problems this solves (e.g. "prop drilling", "render outside root")
+  sourceUrl       String?  // Official Vue doc URL
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@map("vue_documents")
+}

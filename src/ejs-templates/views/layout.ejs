@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title><%= typeof title !== 'undefined' ? title : 'Vue 3 RAG' %></title>
+  <!-- Marked.js for real markdown parsing -->
+  <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body {
+      height: 100%;
+      width: 100%;
+      overflow: hidden;
+      background: #090d16;
+      color: #f1f5f9;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      display: flex;
+      position: relative;
+    }
+
+    /* === FIXED SIDEBAR TRIGGER (5% width, max 54px) === */
+    .sidebar-trigger {
+      width: 5vw;
+      min-width: 44px;
+      max-width: 54px;
+      height: 100vh;
+      background: #0f172a;
+      border-right: 1px solid #1e293b;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding-top: 16px;
+      gap: 18px;
+      cursor: pointer;
+      user-select: none;
+      z-index: 40;
+      flex-shrink: 0;
+    }
+    .trigger-icon {
+      width: 18px;
+      height: 14px;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+    }
+    .trigger-icon span {
+      display: block;
+      height: 2px;
+      background: #42b883;
+      border-radius: 1px;
+    }
+
+    /* === SLIDING DRAWER (OVERLAY, 25% width, max 320px) === */
+    .sidebar-drawer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 25vw;
+      min-width: 240px;
+      max-width: 320px;
+      height: 100vh;
+      background: #0f172a;
+      box-shadow: 12px 0 36px rgba(0,0,0,0.7);
+      border-right: 1px solid #1e293b;
+      display: flex;
+      flex-direction: column;
+      z-index: 50;
+      opacity: 0;
+      pointer-events: none;
+      transform: translateX(-100%);
+      transition: opacity 0.18s cubic-bezier(0.16, 1, 0.3, 1), transform 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .sidebar-trigger:hover + .sidebar-drawer,
+    .sidebar-drawer:hover {
+      opacity: 1;
+      pointer-events: auto;
+      transform: translateX(0);
+    }
+
+    .sidebar-header {
+      padding: 16px 18px;
+      border-bottom: 1px solid #1e293b;
+      font-weight: 700;
+      font-size: 14px;
+      color: #42b883;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .sidebar-menu {
+      flex: 1;
+      overflow-y: auto;
+      padding: 10px 8px;
+      list-style: none;
+    }
+    .sidebar-menu li a {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      color: #94a3b8;
+      text-decoration: none;
+      border-radius: 6px;
+      font-size: 13px;
+      transition: background 0.12s, color 0.12s;
+    }
+    .sidebar-menu li a:hover {
+      background: #1e293b;
+      color: #f8fafc;
+    }
+    .sidebar-menu li a.active {
+      background: #1e293b;
+      color: #42b883;
+      font-weight: 600;
+    }
+
+    /* === MAIN VIEWPORT CONTAINER === */
+    .main-viewport {
+      flex: 1;
+      height: 100vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      background: #090d16;
+      position: relative;
+    }
+
+    /* Global Table Component */
+    table.data-table {
+      width: 100%;
+      border-collapse: collapse;
+      table-layout: fixed;
+      font-size: 13px;
+    }
+    table.data-table th {
+      padding: 12px 14px;
+      text-align: left;
+      color: #64748b;
+      font-weight: 600;
+      border-bottom: 1px solid #1e293b;
+      background: #0b1120;
+    }
+    table.data-table td {
+      padding: 12px 14px;
+      border-bottom: 1px solid #1e293b;
+      vertical-align: middle;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    table.data-table tr:hover td {
+      background: rgba(30, 41, 59, 0.4);
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12.5px;
+      font-weight: 500;
+      border: 1px solid transparent;
+      cursor: pointer;
+      text-decoration: none;
+      transition: background 0.12s, border-color 0.12s, opacity 0.12s;
+    }
+    .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-primary { background: #42b883; color: #0f172a; font-weight: 600; }
+    .btn-primary:hover:not(:disabled) { background: #33a06f; }
+    .btn-outline { border-color: #334155; color: #cbd5e1; background: transparent; }
+    .btn-outline:hover:not(:disabled) { background: #1e293b; color: #f8fafc; }
+    .btn-danger { border-color: #7f1d1d; color: #f87171; background: transparent; }
+    .btn-danger:hover:not(:disabled) { background: #450a0a; color: #fca5a5; }
+
+    .card {
+      background: #0f172a;
+      border: 1px solid #1e293b;
+      border-radius: 8px;
+      padding: 16px 18px;
+    }
+
+    .input-text, .textarea {
+      width: 100%;
+      background: #090d16;
+      border: 1px solid #334155;
+      border-radius: 6px;
+      padding: 8px 12px;
+      color: #f8fafc;
+      font-size: 13px;
+      outline: none;
+      font-family: inherit;
+    }
+    .input-text:focus, .textarea:focus { border-color: #42b883; }
+
+    /* Markdown Styling in Responses */
+    .markdown-body {
+      font-size: 13.5px;
+      line-height: 1.65;
+      color: #e2e8f0;
+      word-break: break-word;
+    }
+    .markdown-body h1, .markdown-body h2, .markdown-body h3 {
+      color: #f8fafc;
+      margin: 12px 0 6px 0;
+      font-weight: 700;
+    }
+    .markdown-body h1 { font-size: 18px; border-bottom: 1px solid #1e293b; padding-bottom: 4px; }
+    .markdown-body h2 { font-size: 16px; }
+    .markdown-body h3 { font-size: 14px; color: #42b883; }
+    .markdown-body p { margin-bottom: 8px; }
+    .markdown-body ul, .markdown-body ol { margin: 6px 0 8px 20px; }
+    .markdown-body li { margin-bottom: 4px; }
+    .markdown-body pre {
+      background: #050811;
+      border: 1px solid #1e293b;
+      border-radius: 6px;
+      padding: 10px 14px;
+      margin: 8px 0;
+      overflow-x: auto;
+    }
+    .markdown-body code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      font-size: 12px;
+      color: #38bdf8;
+    }
+    .markdown-body p code {
+      background: #1e293b;
+      padding: 2px 5px;
+      border-radius: 4px;
+      color: #42b883;
+    }
+    .markdown-body blockquote {
+      border-left: 3px solid #42b883;
+      padding-left: 10px;
+      color: #94a3b8;
+      margin: 6px 0;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- TRIGGER STRIP (5%w) -->
+  <aside class="sidebar-trigger">
+    <div class="trigger-icon">
+      <span></span>
+      <span></span>
+      <span></span>
+    </div>
+  </aside>
+
+  <!-- SIDEBAR OPENED (25%w + absolute overlay) -->
+  <aside class="sidebar-drawer">
+    <div class="sidebar-header">
+      <span style="font-size: 16px;">▲</span> <%= typeof brand !== 'undefined' ? brand : 'Vue 3 Docs' %>
+    </div>
+    <ul class="sidebar-menu">
+      <% if (typeof menuItems !== 'undefined' && Array.isArray(menuItems)) { %>
+        <% menuItems.forEach(item => { %>
+          <li>
+            <a href="<%= item.url %>" class="<%= item.active ? 'active' : '' %>">
+              <%= item.label %>
+            </a>
+          </li>
+        <% }); %>
+      <% } else { %>
+        <li><a href="/documents">API & Components</a></li>
+        <li><a href="/chat">AI Assistant</a></li>
+        <li><a href="/providers">Providers</a></li>
+        <li><a href="/settings">Settings</a></li>
+      <% } %>
+    </ul>
+  </aside>
+
+  <!-- MAIN VIEWPORT -->
+  <div class="main-viewport">
+    <%- content %>
+  </div>
+
+</body>
+</html>
