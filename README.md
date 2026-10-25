@@ -23,11 +23,10 @@ $$P(w_{t} \mid w_1, w_2, \dots, w_{t-1})$$
 Instead of fine-tuning or re-training an entire model (costly and static), **RAG** bridges the gap by fetching authoritative documents from an external storage layer and injecting them directly into the context window before generation:
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#1e293b", "primaryTextColor": "#f8fafc", "primaryBorderColor": "#42b883", "lineColor": "#475569", "textColor": "#0f172a", "mainBkg": "#0f172a", "nodeBorder": "#334155"}}}%%
 flowchart LR
-  classDef default fill:#0f172a,stroke:#94a3b8,stroke-width:1px,color:#f8fafc;
-  classDef core fill:#0f172a,stroke:#42b883,stroke-width:2px,color:#f8fafc;
-  classDef data fill:#0f172a,stroke:#38bdf8,stroke-width:1.5px,color:#f8fafc;
+  classDef default stroke:#94a3b8,stroke-width:1px;
+  classDef core stroke:#10b981,stroke-width:2px;
+  classDef data stroke:#3b82f6,stroke-width:2px;
 
   Q["User Query (Natural Language)"]:::default --> R["Retriever (Fuzzy + Vector Cosine)"]:::core
   DB["Knowledge Base (MongoDB + SQLite)"]:::data <--> R
@@ -51,12 +50,11 @@ $$\cos(\theta) = \frac{\vec{Q} \cdot \vec{D}}{\|\vec{Q}\| \|\vec{D}\|} = \frac{\
 ## 2. System Architecture & Module Decomposition
 
 ```mermaid
-%%{init: {"theme": "base", "themeVariables": {"primaryColor": "#1e293b", "primaryTextColor": "#f8fafc", "primaryBorderColor": "#42b883", "lineColor": "#475569", "textColor": "#0f172a", "mainBkg": "#0f172a", "nodeBorder": "#334155"}}}%%
 flowchart TD
-  classDef default fill:#0f172a,stroke:#94a3b8,stroke-width:1px,color:#f8fafc;
-  classDef core fill:#0f172a,stroke:#42b883,stroke-width:2px,color:#f8fafc;
-  classDef storage fill:#0f172a,stroke:#38bdf8,stroke-width:1.5px,color:#f8fafc;
-  classDef view fill:#0f172a,stroke:#f59e0b,stroke-width:1.5px,color:#f8fafc;
+  classDef default stroke:#94a3b8,stroke-width:1px;
+  classDef core stroke:#10b981,stroke-width:2px;
+  classDef storage stroke:#3b82f6,stroke-width:2px;
+  classDef view stroke:#f59e0b,stroke-width:1.5px;
 
   subgraph PresentationLayer["Presentation Layer (src/ejs-templates)"]
     DocView["Wiki & Search Interface (/documents)"]:::view
@@ -109,7 +107,6 @@ flowchart TD
 When a user describes an architectural problem in natural language (e.g., *"How do I keep my filter state in component A while rendering the controller onto the global navbar?"*):
 
 ```mermaid
-%%{init: {"theme": "base", "sequence": {"mirrorActors": false}, "themeVariables": {"actorBkg": "#0f172a", "actorBorder": "#42b883", "actorTextColor": "#f8fafc", "actorLineColor": "#64748b", "signalColor": "#cbd5e1", "signalTextColor": "#0f172a", "labelBoxBkgColor": "#0f172a", "labelBoxBorderColor": "#334155", "labelTextColor": "#f8fafc", "loopTextColor": "#f8fafc", "noteBorderColor": "#38bdf8", "noteBkgColor": "#1e293b", "noteTextColor": "#f8fafc"}}}%%
 sequenceDiagram
   autonumber
   actor User as Developer
@@ -142,7 +139,6 @@ sequenceDiagram
 ### Sequence 2: Multi-Mode Search with Top-K Debugging (`/documents`)
 
 ```mermaid
-%%{init: {"theme": "base", "sequence": {"mirrorActors": false}, "themeVariables": {"actorBkg": "#0f172a", "actorBorder": "#42b883", "actorTextColor": "#f8fafc", "actorLineColor": "#64748b", "signalColor": "#cbd5e1", "signalTextColor": "#0f172a", "labelBoxBkgColor": "#0f172a", "labelBoxBorderColor": "#334155", "labelTextColor": "#f8fafc", "loopTextColor": "#f8fafc", "noteBorderColor": "#38bdf8", "noteBkgColor": "#1e293b", "noteTextColor": "#f8fafc"}}}%%
 sequenceDiagram
   autonumber
   actor User as Developer
